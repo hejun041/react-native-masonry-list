@@ -1,3 +1,4 @@
+```javascript
 <Masonry
     sorted
     containerWidth={super.getWidth()}
@@ -15,6 +16,7 @@
         onEndReachedThreshold: 0.2,
         onEndReached: this._onEndReached,
         ListHeaderComponent: this._renderHeader.bind(this),
-        ListFooterComponent: this.images.length != 0 && (this.loadEnd ? this._renderNoMore : this._renderLoading)
+        ListFooterComponent: this.images.length != 0 && (this.loadEnd ?this._renderNoMore: this._renderLoading)
     }}
 />
+```
