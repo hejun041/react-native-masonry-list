@@ -20,3 +20,4 @@
     }}
 />
 ```
+![react-native-masonry-list](https://github.com/hejun041/react-native-masonry-list/blob/master/src/assets/test.gif?raw=true)
