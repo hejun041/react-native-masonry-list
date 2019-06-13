@@ -1,5 +1,5 @@
 import React from "react";
-import { FlatList } from "react-native";
+import { FlatList, InteractionManager } from "react-native";
 import PropTypes from "prop-types";
 
 import { resolveImage, resolveLocal } from "./model";
@@ -71,15 +71,17 @@ export default class MasonryList extends React.PureComponent {
 	columnHighestHeight = null;
 
 	componentWillMount() {
-		if (this.props.containerWidth) {
-			this.resolveImages(
-				this.props.itemSource,
-				this.props.images,
-				this.props.layoutDimensions,
-				this.props.columns,
-				this.props.sorted
-			);
-		}
+		InteractionManager.runAfterInteractions(() => {
+			if (this.props.containerWidth) {
+				this.resolveImages(
+					this.props.itemSource,
+					this.props.images,
+					this.props.layoutDimensions,
+					this.props.columns,
+					this.props.sorted
+				);
+			}
+		})
 	}
 
 	componentWillReceiveProps = (nextProps) => {
@@ -227,59 +229,103 @@ export default class MasonryList extends React.PureComponent {
 						/* eslint-enable no-console */
 					}
 				});
-			sequence(Task, resolveImages.map((resolveTask) => {
-				if (resolveTask && resolveTask.fork) {
-					return resolveTask
-				}
-			})).fork(
-				(err) => { console.warn("react-native-masonry-list", "Image failed to load.") },
-				(resolvedImages) => {
-					resolvedImages.map((resolvedData, index) => {
-						const resolvedImage = getItemSource(resolvedData, itemSource);
-						if (sorted) {
+			if (sorted) {
+				sequence(Task, resolveImages.map((resolveTask) => {
+					if (resolveTask && resolveTask.fork) {
+						return resolveTask
+					}
+				})).fork(
+					(err) => { console.warn("react-native-masonry-list", "Image failed to load.") },
+					(resolvedImages) => {
+						resolvedImages.map((resolvedData, index) => {
+							const resolvedImage = getItemSource(resolvedData, itemSource);
 							if (this.renderIndex !== 0) {
 								index = this.renderIndex
 							}
 							resolvedData.index = index;
-						} else {
-							resolvedData.index = this.unsortedIndex;
-							this.unsortedIndex++;
-						}
 
-						resolvedImage.masonryDimensions =
-							this._getCalculatedDimensions(
-								resolvedImage.dimensions,
-								layoutDimensions.columnWidth,
-								layoutDimensions.gutterSize
-							);
+							resolvedImage.masonryDimensions =
+								this._getCalculatedDimensions(
+									resolvedImage.dimensions,
+									layoutDimensions.columnWidth,
+									layoutDimensions.gutterSize
+								);
 
-						resolvedData.column = _assignColumns(resolvedImage, columns);
+							resolvedData.column = _assignColumns(resolvedImage, columns);
 
-						let finalizedData = setItemSource(resolvedData, itemSource, resolvedImage);
+							let finalizedData = setItemSource(resolvedData, itemSource, resolvedImage);
 
-						if (this.props.onImageResolved) {
-							finalizedData = this.props.onImageResolved(finalizedData, this.renderIndex) || finalizedData;
-						}
+							if (this.props.onImageResolved) {
+								finalizedData = this.props.onImageResolved(finalizedData, this.renderIndex) || finalizedData;
+							}
 
-						if (this.renderIndex !== 0) {
-							this.setState(state => {
-								const sortedData = insertIntoColumn(finalizedData, state._sortedData, sorted);
-								this._calculatedData = this._calculatedData.concat(finalizedData);
+							if (this.renderIndex !== 0) {
+								this.setState(state => {
+									const sortedData = insertIntoColumn(finalizedData, state._sortedData, sorted);
+									this._calculatedData = this._calculatedData.concat(finalizedData);
+									this.renderIndex++;
+									return {
+										_sortedData: sortedData
+									};
+								});
+							} else {
+								const sortedData = insertIntoColumn(finalizedData, [], sorted);
+								this._calculatedData = [finalizedData];
 								this.renderIndex++;
-								return {
+								this.setState({
 									_sortedData: sortedData
-								};
-							});
-						} else {
-							const sortedData = insertIntoColumn(finalizedData, [], sorted);
-							this._calculatedData = [finalizedData];
-							this.renderIndex++;
-							this.setState({
-								_sortedData: sortedData
-							});
-						}
+								});
+							}
+						});
 					});
-				});
+			} else {
+				resolveImages.map((resolveTask) => {
+					if (resolveTask && resolveTask.fork) {
+						return resolveTask.fork(
+							(err) => { console.warn("react-native-masonry-list", "Image failed to load.") },
+							(resolvedData) => {
+								const resolvedImage = getItemSource(resolvedData, itemSource);
+
+								resolvedImage.index = this.unsortedIndex;
+								this.unsortedIndex++;
+
+								resolvedImage.masonryDimensions =
+									this._getCalculatedDimensions(
+										resolvedImage.dimensions,
+										layoutDimensions.columnWidth,
+										layoutDimensions.gutterSize
+									);
+
+								resolvedData.column = _assignColumns(resolvedImage, columns);
+
+								let finalizedData = setItemSource(resolvedData, itemSource, resolvedImage);
+
+								if (this.props.onImageResolved) {
+									finalizedData = this.props.onImageResolved(finalizedData, this.renderIndex) || finalizedData;
+								}
+
+								if (this.renderIndex !== 0) {
+									this.setState(state => {
+										const sortedData = insertIntoColumn(finalizedData, state._sortedData, sorted);
+										this._calculatedData = this._calculatedData.concat(finalizedData);
+										this.renderIndex++;
+										return {
+											_sortedData: sortedData
+										};
+									});
+								} else {
+									const sortedData = insertIntoColumn(finalizedData, [], sorted);
+									this._calculatedData = [finalizedData];
+									this.renderIndex++;
+									this.setState({
+										_sortedData: sortedData
+									});
+								}
+							});
+					}
+				})
+			}
+
 		} else if (images) {
 			const resolveImages = images
 				.map((image) => {
@@ -317,57 +363,95 @@ export default class MasonryList extends React.PureComponent {
 						/* eslint-enable no-console */
 					}
 				});
-			sequence(Task, resolveImages.map((resolveTask) => {
-				if (resolveTask && resolveTask.fork) {
-					return resolveTask
-				}
-			})).fork(
-				(err) => { console.warn("react-native-masonry-list", "Image failed to load.") },
-				(resolvedImages) => {
-					resolvedImages.map((resolvedImage, index) => {
-						if (sorted) {
+			if (sorted) {
+				sequence(Task, resolveImages.map((resolveTask) => {
+					if (resolveTask && resolveTask.fork) {
+						return resolveTask
+					}
+				})).fork(
+					(err) => { console.warn("react-native-masonry-list", "Image failed to load.") },
+					(resolvedImages) => {
+						resolvedImages.map((resolvedImage, index) => {
 							if (this.renderIndex !== 0) {
 								index = this.renderIndex
 							}
 							resolvedImage.index = index;
-						} else {
-							resolvedImage.index = this.unsortedIndex;
-							this.unsortedIndex++;
-						}
 
-						resolvedImage.masonryDimensions =
-							this._getCalculatedDimensions(
-								resolvedImage.dimensions,
-								layoutDimensions.columnWidth,
-								layoutDimensions.gutterSize
-							);
+							resolvedImage.masonryDimensions =
+								this._getCalculatedDimensions(
+									resolvedImage.dimensions,
+									layoutDimensions.columnWidth,
+									layoutDimensions.gutterSize
+								);
 
-						resolvedImage.column = _assignColumns(resolvedImage, columns);
+							resolvedImage.column = _assignColumns(resolvedImage, columns);
 
-						if (this.props.onImageResolved) {
-							resolvedImage = this.props.onImageResolved(resolvedImage, this.renderIndex) || resolvedImage;
-						}
+							if (this.props.onImageResolved) {
+								resolvedImage = this.props.onImageResolved(resolvedImage, this.renderIndex) || resolvedImage;
+							}
 
-						if (this.renderIndex !== 0) {
-							this.setState((state) => {
-								const sortedData = insertIntoColumn(resolvedImage, state._sortedData, sorted);
-								this._calculatedData = this._calculatedData.concat(resolvedImage);
+							if (this.renderIndex !== 0) {
+								this.setState((state) => {
+									const sortedData = insertIntoColumn(resolvedImage, state._sortedData, sorted);
+									this._calculatedData = this._calculatedData.concat(resolvedImage);
+									this.renderIndex++;
+									return {
+										_sortedData: sortedData
+									};
+								});
+							} else {
+								const sortedData = insertIntoColumn(resolvedImage, [], sorted);
+								this._calculatedData = [resolvedImage];
 								this.renderIndex++;
-								return {
+								this.setState({
 									_sortedData: sortedData
-								};
+								});
+							}
+						})
+					});
+			} else {
+				resolveImages.map((resolveTask) => {
+					if (resolveTask && resolveTask.fork) {
+						resolveTask.fork(
+							(err) => { console.warn("react-native-masonry-list", "Image failed to load.") },
+							(resolvedImage) => {
+								resolvedImage.index = this.unsortedIndex;
+								this.unsortedIndex++;
+
+								resolvedImage.masonryDimensions =
+									this._getCalculatedDimensions(
+										resolvedImage.dimensions,
+										layoutDimensions.columnWidth,
+										layoutDimensions.gutterSize
+									);
+
+								resolvedImage.column = _assignColumns(resolvedImage, columns);
+
+								if (this.props.onImageResolved) {
+									resolvedImage = this.props.onImageResolved(resolvedImage, this.renderIndex) || resolvedImage;
+								}
+
+								if (this.renderIndex !== 0) {
+									this.setState((state) => {
+										const sortedData = insertIntoColumn(resolvedImage, state._sortedData, sorted);
+										this._calculatedData = this._calculatedData.concat(resolvedImage);
+										this.renderIndex++;
+										return {
+											_sortedData: sortedData
+										};
+									});
+								} else {
+									const sortedData = insertIntoColumn(resolvedImage, [], sorted);
+									this._calculatedData = [resolvedImage];
+									this.renderIndex++;
+									this.setState({
+										_sortedData: sortedData
+									});
+								}
 							});
-						} else {
-							const sortedData = insertIntoColumn(resolvedImage, [], sorted);
-							this._calculatedData = [resolvedImage];
-							this.renderIndex++;
-							this.setState({
-								_sortedData: sortedData
-							});
-						}
-						// console.log('resolvedImage===>', JSON.stringify(resolvedImage) + "===sortedData ==>" + JSON.stringify(this.state._sortedData))
-					})
-				});
+					}
+				})
+			}
 		}
 	}
 
