@@ -111,25 +111,27 @@ export default class MasonryList extends React.PureComponent {
 				nextProps.sorted
 			);
 		}
-		else if (nextProps.images !== this.props.images) {
-			if (nextProps.images.length > this.props.images.length) {
-				let newImages = nextProps.images.concat().splice(this.props.images.length, nextProps.images.length)
-				this.resolveImages(
-					nextProps.itemSource,
-					newImages,
-					nextProps.layoutDimensions,
-					nextProps.columns,
-					nextProps.sorted
-				);
-			} else {
-				this.resolveImages(
-					nextProps.itemSource,
-					nextProps.images,
-					nextProps.layoutDimensions,
-					nextProps.columns,
-					nextProps.sorted
-				);
-			}
+		//load more add datasource
+		if (nextProps.images.length > this.props.images.length) {
+			let newImages = nextProps.images.concat().splice(this.props.images.length, nextProps.images.length) //nextProps.images ���鱻�ı�Ϊ����
+			this.resolveImages(
+				nextProps.itemSource,
+				newImages,
+				nextProps.layoutDimensions,
+				nextProps.columns,
+				nextProps.sorted
+			);
+		}
+		//pull refresh reset datasource
+		if (nextProps.images.length < this.props.images.length) {
+			this.renderIndex = 0
+			this.resolveImages(
+				nextProps.itemSource,
+				nextProps.images,
+				nextProps.layoutDimensions,
+				nextProps.columns,
+				nextProps.sorted
+			);
 		}
 	}
 
